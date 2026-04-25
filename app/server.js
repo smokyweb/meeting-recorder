@@ -9,20 +9,42 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// ── List all bots from Recall, split into upcoming/past ──────────────────────
+const DONE_STATUSES = ["done", "completed", "call_ended"];
+const ACTIVE_STATUSES = ["scheduled", "ready", "joining_call", "in_call_not_recording", "in_call_recording", "recording"];
+
+// ── List all bots from Recall, split into upcoming/past; auto-upload completed ones ──
 app.get("/api/recordings", async (_req, res) => {
   try {
     const data = await recallApi("GET", "/bot/?limit=50");
     const bots = data.results || data || [];
-    const now  = Date.now();
     const out  = [];
 
     for (const bot of bots) {
       const lastStatus = bot.status_changes?.[bot.status_changes.length - 1];
       const status     = lastStatus?.code || "scheduled";
       const rec        = bot.recordings?.[0];
-      const driveLink  = bot.metadata?.drive_link || null;
-      const transcriptLink = bot.metadata?.transcript_link || null;
+      let driveLink    = bot.metadata?.drive_link || null;
+      let transcriptLink = bot.metadata?.transcript_link || null;
+
+      // Auto-upload to Drive if done and not yet uploaded
+      if (DONE_STATUSES.includes(status) && !driveLink) {
+        const videoUrl = rec?.media_shortcuts?.video_mixed?.data?.download_url;
+        if (videoUrl) {
+          try {
+            const result = await uploadRecordingToDrive(bot.id, bot.metadata?.label || bot.id);
+            if (result.uploaded) {
+              driveLink = result.driveLink;
+              transcriptLink = result.transcriptLink || null;
+              // Persist links back to Recall bot metadata
+              await recallApi("PATCH", `/bot/${bot.id}`, {
+                metadata: { ...bot.metadata, drive_link: driveLink, transcript_link: transcriptLink },
+              }).catch(() => {});
+            }
+          } catch (uploadErr) {
+            console.error(`Auto-upload failed for ${bot.id}:`, uploadErr.message);
+          }
+        }
+      }
 
       out.push({
         bot_id:          bot.id,
@@ -32,13 +54,11 @@ app.get("/api/recordings", async (_req, res) => {
         stop_at:         bot.metadata?.stop_at || null,
         drive_link:      driveLink,
         transcript_link: transcriptLink,
-        // video_url only shown if Drive upload hasn't happened yet
-        video_url:       (!driveLink && rec?.media_shortcuts?.video_mixed?.data?.download_url) || null,
       });
     }
 
     const upcoming = out
-      .filter(r => new Date(r.start_at) >= now || ["scheduled", "ready", "joining_call"].includes(r.status))
+      .filter(r => ACTIVE_STATUSES.includes(r.status))
       .sort((a, b) => new Date(a.start_at) - new Date(b.start_at));
     const past = out
       .filter(r => !upcoming.includes(r))

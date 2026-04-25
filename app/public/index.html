@@ -318,18 +318,12 @@ function renderPast(r) {
 
   let driveHtml = "";
   if (r.drive_link) {
-    driveHtml = `<a class="drive-link" href="${escapeHtml(r.drive_link)}" target="_blank" rel="noopener">
-      📂 Open in Google Drive
-    </a>`;
+    driveHtml = `<a class="drive-link" href="${escapeHtml(r.drive_link)}" target="_blank" rel="noopener">📂 Open in Google Drive</a>`;
     if (r.transcript_link) {
-      driveHtml += ` <a class="ghost" style="font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;color:var(--muted);text-decoration:none;" href="${escapeHtml(r.transcript_link)}" target="_blank">Transcript</a>`;
+      driveHtml += ` <a style="font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;color:var(--muted);text-decoration:none;" href="${escapeHtml(r.transcript_link)}" target="_blank">Transcript</a>`;
     }
-  } else if (["done","completed","call_ended"].includes(status)) {
-    // Auto-trigger upload and show uploading state
-    driveHtml = `<span class="pill uploading" id="uploading-${r.bot_id}">⏫ Uploading to Drive…</span>`;
-    setTimeout(() => autoUpload(r.bot_id), 100);
   } else {
-    driveHtml = `<span class="pill ${cls}">${status}</span>`;
+    driveHtml = `<span class="pill uploading">⏫ Processing…</span>`;
   }
 
   return `
@@ -338,31 +332,8 @@ function renderPast(r) {
         <div class="rec-label">${escapeHtml(r.label)}</div>
         <div class="rec-meta">${fmtLocal(r.start_at)} → ${fmtLocal(r.stop_at)}</div>
       </div>
-      <div class="row-actions" id="actions-${r.bot_id}">
-        ${driveHtml}
-      </div>
+      <div class="row-actions">${driveHtml}</div>
     </div>`;
-}
-
-async function autoUpload(botId) {
-  try {
-    const res = await fetch(`/api/recordings/${botId}/upload`, { method: "POST" });
-    const data = await res.json();
-    const actEl = document.getElementById("actions-" + botId);
-    if (!actEl) return;
-    if (res.ok && data.ok && data.drive_link) {
-      actEl.innerHTML = `<a class="drive-link" href="${escapeHtml(data.drive_link)}" target="_blank" rel="noopener">📂 Open in Google Drive</a>`;
-      if (data.transcript_link) {
-        actEl.innerHTML += ` <a style="font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;color:var(--muted);text-decoration:none;" href="${escapeHtml(data.transcript_link)}" target="_blank">Transcript</a>`;
-      }
-    } else {
-      // Not ready yet — show a manual retry
-      actEl.innerHTML = `<button class="ghost" onclick="autoUpload('${botId}')">↑ Retry Upload</button><span style="color:var(--muted);font-size:12px;margin-left:8px">${data.reason || data.error || "Not ready"}</span>`;
-    }
-  } catch (err) {
-    const actEl = document.getElementById("actions-" + botId);
-    if (actEl) actEl.innerHTML = `<button class="ghost" onclick="autoUpload('${botId}')">↑ Retry Upload</button>`;
-  }
 }
 
 async function cancelBot(botId) {
