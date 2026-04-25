@@ -12,7 +12,7 @@ const BASE = `https://${REGION}.recall.ai/api/v1`;
 
 // Google Drive
 const DRIVE_CREDS_PATH = process.env.GOOGLE_DRIVE_CREDS ||
-  "C:\\Users\\kevin\\.openclaw\\workspace\\google-drive-creds.json";
+  (fs.existsSync("/app/data/google-drive-creds.json") ? "/app/data/google-drive-creds.json" : "C:\\Users\\kevin\\.openclaw\\workspace\\google-drive-creds.json");
 const DRIVE_FOLDER_NAME = "meeting-recordings";
 
 function requireApiKey() {
@@ -48,10 +48,21 @@ async function recallApi(method, pathSegment, body) {
 
 async function getDriveToken() {
   let creds;
-  try {
-    creds = JSON.parse(fs.readFileSync(DRIVE_CREDS_PATH, "utf8"));
-  } catch {
-    throw new Error("Could not read Google Drive credentials from " + DRIVE_CREDS_PATH);
+  // Prefer env vars (server deployment) over creds file (local dev)
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_REFRESH_TOKEN) {
+    creds = {
+      client_id:     process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+      access_token:  process.env._GOOGLE_ACCESS_TOKEN_CACHE || null,
+      expiry_date:   parseInt(process.env._GOOGLE_EXPIRY_CACHE || "0", 10),
+    };
+  } else {
+    try {
+      creds = JSON.parse(fs.readFileSync(DRIVE_CREDS_PATH, "utf8"));
+    } catch {
+      throw new Error("Could not read Google Drive credentials from " + DRIVE_CREDS_PATH);
+    }
   }
 
   // Refresh if expired (with 60s buffer)
@@ -71,7 +82,13 @@ async function getDriveToken() {
     if (!tok.access_token) throw new Error("Token refresh failed: " + JSON.stringify(tok));
     creds.access_token = tok.access_token;
     creds.expiry_date = Date.now() + (tok.expires_in * 1000);
-    fs.writeFileSync(DRIVE_CREDS_PATH, JSON.stringify(creds, null, 2));
+    // Cache in memory via env (server) or write to file (local)
+    if (process.env.GOOGLE_CLIENT_ID) {
+      process.env._GOOGLE_ACCESS_TOKEN_CACHE = tok.access_token;
+      process.env._GOOGLE_EXPIRY_CACHE = String(creds.expiry_date);
+    } else {
+      try { fs.writeFileSync(DRIVE_CREDS_PATH, JSON.stringify(creds, null, 2)); } catch {}
+    }
   }
   return creds.access_token;
 }
