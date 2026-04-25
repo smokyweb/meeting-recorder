@@ -238,23 +238,59 @@ async function refresh() {
 function renderRow(r) {
   const status = r.status || "unknown";
   const cls = status.toLowerCase().replace(/\./g, "_");
+  const done = ["done", "completed", "call_ended"].includes(status);
   const actions = [];
-  if (r.video_url) actions.push(`<a class="link" href="${r.video_url}" target="_blank" rel="noopener">Download video</a>`);
-  if (r.transcript_url) actions.push(`<a class="link" href="${r.transcript_url}" target="_blank" rel="noopener">Transcript</a>`);
-  if (!["done", "completed", "call_ended", "fatal"].includes(status)) {
+
+  if (r.drive_link) {
+    actions.push(`<a class="link" href="${r.drive_link}" target="_blank" rel="noopener">📂 Google Drive</a>`);
+  } else if (done) {
+    actions.push(`<button class="link" onclick="uploadToDrive('${r.bot_id}', this)">↑ Upload to Drive</button>`);
+  }
+  if (r.transcript_link) {
+    actions.push(`<a class="link" href="${r.transcript_link}" target="_blank" rel="noopener">Transcript</a>`);
+  }
+  if (!done && status !== "fatal") {
     actions.push(`<button class="danger" onclick="stopBot('${r.bot_id}')">Cancel</button>`);
   }
+
+  const driveTag = r.drive_link
+    ? `<span class="pill done" style="margin-left:4px">📂 on Drive</span>`
+    : "";
+
   return `
-    <div class="row">
+    <div class="row" id="row-${r.bot_id}">
       <div class="row-main">
         <div class="label">${escapeHtml(r.label)}</div>
-        <div class="meta">${fmtLocal(r.start_at)} → ${fmtLocal(r.stop_at)}</div>
-        <div class="meta" style="word-break: break-all;">${escapeHtml(r.meeting_url)}</div>
-        <div style="margin-top: 6px;"><span class="pill ${cls}">${status}</span></div>
+        <div class="meta">${fmtLocal(r.start_at)}${r.stop_at ? " → " + fmtLocal(r.stop_at) : ""}</div>
+        <div style="margin-top:6px">
+          <span class="pill ${cls}">${status}</span>${driveTag}
+        </div>
       </div>
       <div class="row-actions">${actions.join("")}</div>
     </div>
   `;
+}
+
+async function uploadToDrive(botId, btn) {
+  btn.disabled = true;
+  btn.textContent = "Uploading…";
+  try {
+    const res = await fetch(`/api/recordings/${botId}/upload`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.reason || data.error || "Upload failed");
+    // Update the row in-place
+    const row = document.getElementById("row-" + botId);
+    if (row) {
+      const actDiv = row.querySelector(".row-actions");
+      if (actDiv) actDiv.innerHTML = `<a class="link" href="${data.drive_link}" target="_blank">📂 Google Drive</a>`;
+      const pills = row.querySelector("div[style]");
+      if (pills) pills.innerHTML += ` <span class="pill done">📂 on Drive</span>`;
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = "↑ Upload to Drive";
+    alert("Upload failed: " + err.message);
+  }
 }
 
 function escapeHtml(s) {
