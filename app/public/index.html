@@ -91,6 +91,9 @@
   .pill.failed, .pill.fatal, .pill.lookup_failed { background: rgba(245,165,36,0.2); color: var(--warn); }
   .empty { color: var(--muted); padding: 20px 0; text-align: center; font-size: 14px; }
   a { color: var(--accent); }
+  .section-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--accent); padding: 10px 0 6px; border-top: 1px solid var(--border); margin-top: 6px; }
+  .section-label:first-child { border-top: 0; margin-top: 0; }
+  .section-label.past { color: var(--muted); }
   .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 </style>
 </head>
@@ -210,12 +213,23 @@ async function refresh() {
   list.innerHTML = `<div class="empty">Loading…</div>`;
   try {
     const res = await fetch("/api/recordings");
-    const items = await res.json();
-    if (items.length === 0) {
-      list.innerHTML = `<div class="empty">No recordings scheduled yet.</div>`;
+    const data = await res.json();
+    const upcoming = data.upcoming || [];
+    const past = data.past || [];
+    if (upcoming.length === 0 && past.length === 0) {
+      list.innerHTML = `<div class="empty">No recordings yet.</div>`;
       return;
     }
-    list.innerHTML = items.map(renderRow).join("");
+    let html = "";
+    if (upcoming.length > 0) {
+      html += `<div class="section-label">📅 Upcoming (${upcoming.length})</div>`;
+      html += upcoming.map(renderRow).join("");
+    }
+    if (past.length > 0) {
+      html += `<div class="section-label past">🕘 Past (${past.length})</div>`;
+      html += past.map(renderRow).join("");
+    }
+    list.innerHTML = html;
   } catch (err) {
     list.innerHTML = `<div class="msg err">${err.message}</div>`;
   }

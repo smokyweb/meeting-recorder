@@ -18,21 +18,31 @@ app.get("/api/recordings", async (_req, res) => {
   const state = loadState();
   const out = [];
   for (const r of state.recordings) {
-    const entry = { ...r };
-    try {
-      const bot = await recallApi("GET", `/bot/${r.bot_id}`);
-      const last = bot.status_changes?.[bot.status_changes.length - 1];
-      entry.status = last?.code || "unknown";
-      const rec = bot.recordings?.[0];
-      entry.video_url = rec?.media_shortcuts?.video_mixed?.data?.download_url || null;
-      entry.transcript_url = rec?.media_shortcuts?.transcript?.data?.download_url || null;
-    } catch (err) {
-      entry.status = "lookup_failed";
-      entry.error = err.message;
+    // Normalise field names — agent scripts use start/stop, web form uses start_at/stop_at
+    const entry = {
+      ...r,
+      start_at: r.start_at || r.start || null,
+      stop_at:  r.stop_at  || r.stop  || null,
+    };
+    if (entry.bot_id) {
+      try {
+        const bot = await recallApi("GET", `/bot/${entry.bot_id}`);
+        const last = bot.status_changes?.[bot.status_changes.length - 1];
+        entry.status = last?.code || entry.status || "unknown";
+        const rec = bot.recordings?.[0];
+        entry.video_url = rec?.media_shortcuts?.video_mixed?.data?.download_url || null;
+        entry.transcript_url = rec?.media_shortcuts?.transcript?.data?.download_url || null;
+      } catch (err) {
+        entry.status = entry.status || "lookup_failed";
+      }
     }
     out.push(entry);
   }
-  res.json(out.reverse()); // newest first
+  // Sort: upcoming first (by start_at), then past most-recent first
+  const now = Date.now();
+  const upcoming = out.filter(r => new Date(r.start_at) >= now).sort((a, b) => new Date(a.start_at) - new Date(b.start_at));
+  const past     = out.filter(r => new Date(r.start_at) <  now).sort((a, b) => new Date(b.start_at) - new Date(a.start_at));
+  res.json({ upcoming, past });
 });
 
 // ---- Schedule a new recording ----
