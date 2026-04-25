@@ -52,6 +52,23 @@ function loadState() {
 function saveState(state) {
   fs.mkdirSync(path.dirname(STATE_PATH), { recursive: true });
   fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
+  // Sync to server in background (best-effort)
+  syncToServer(STATE_PATH).catch(() => {});
+}
+
+async function syncToServer(filePath) {
+  const SERVER = process.env.RECORDER_SERVER_URL || "https://recorder.bluesapps.com";
+  const content = fs.readFileSync(filePath, "utf8");
+  // POST to a sync endpoint — server exposes /api/sync for agent use
+  const res = await fetch(`${SERVER}/api/sync`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Sync-Key": process.env.RECORDER_SYNC_KEY || "axel-sync-2026",
+    },
+    body: content,
+  });
+  if (!res.ok) throw new Error(`Sync failed: ${res.status}`);
 }
 
 function parseArgs(argv) {

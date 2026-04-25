@@ -90,6 +90,24 @@ app.post("/api/recordings", async (req, res) => {
   }
 });
 
+// ---- Agent sync endpoint (Axel pushes recordings.json here) ----
+app.post("/api/sync", (req, res) => {
+  const key = req.headers["x-sync-key"];
+  if (key !== (process.env.RECORDER_SYNC_KEY || "axel-sync-2026")) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const state = req.body;
+    if (!Array.isArray(state.recordings)) {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+    saveState(state);
+    res.json({ ok: true, count: state.recordings.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---- Cancel / stop ----
 app.delete("/api/recordings/:botId", async (req, res) => {
   const botId = req.params.botId;
