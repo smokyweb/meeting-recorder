@@ -7,7 +7,7 @@
 
 const express = require("express");
 const path = require("path");
-const { recallApi, loadState, saveState } = require("../scripts/_lib");
+const { recallApi, loadState, saveState } = require("./_lib");
 
 const app = express();
 app.use(express.json());
