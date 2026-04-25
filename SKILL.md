@@ -78,8 +78,14 @@ Confirm with the user before calling stop — this is destructive.
 The user rarely types ISO-8601. They say "tomorrow at 9am" or "Sunday 10:30 to 5". Always:
 1. Resolve "tomorrow"/"Sunday" to a specific date using the current date.
 2. Assume America/New_York (East TN) unless told otherwise.
-3. Emit ISO-8601 with explicit offset (e.g. `2026-04-26T09:00:00-04:00` during DST, `-05:00` during standard time).
-4. Read back the resolved wall-clock time and date to the user before booking, so a time-zone mistake is caught before the bot is scheduled.
+3. Emit ISO-8601 with **explicit UTC offset** — never a bare local time or UTC "Z" time.
+   - Kevin says "EST" to mean his local Eastern Time regardless of DST.
+   - Current offset is `-04:00` (Eastern Daylight Time, Mar–Nov).
+   - Winter offset is `-05:00` (Eastern Standard Time, Nov–Mar).
+   - Always derive the correct offset from the current date, not from the word "EST".
+4. **Before calling book.js**, verify: convert your ISO string back to UTC and confirm it is in the future. If it resolves to a past time or within 12 minutes, stop and tell the user.
+5. Read back the resolved wall-clock time and date to the user before booking, so a time-zone mistake is caught before the bot is scheduled.
+6. **Double-check:** `2026-04-27T10:00:00-04:00` = `2026-04-27T14:00:00Z`. That UTC time must be > now (UTC) at the moment of booking.
 
 ## Output format
 

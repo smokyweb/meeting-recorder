@@ -1,3 +1,20 @@
 {
-  "recordings": []
+  "recordings": [
+    {
+      "id": "cedc37e8-c438-4c03-8347-f7a76c0e37c8",
+      "label": "Zoom Session Apr 25",
+      "start": "2026-04-25T10:00:00-04:00",
+      "stop": "2026-04-25T19:00:00-04:00",
+      "status": "scheduled",
+      "created": "2026-04-25T01:52:05.109Z"
+    },
+    {
+      "id": "cc198792-e447-4204-9103-8b7ea40bee0e",
+      "label": "Zoom Session Apr 27",
+      "start": "2026-04-27T10:00:00-04:00",
+      "stop": "2026-04-27T19:00:00-04:00",
+      "status": "scheduled",
+      "created": "2026-04-25T01:52:05.455Z"
+    }
+  ]
 }

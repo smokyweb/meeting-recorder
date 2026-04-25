@@ -38,8 +38,6 @@ async function main() {
     recording_config: {
       video_mixed_mp4: {},
       video_mixed_layout: "speaker_view",
-      video_mixed_participant_video_when_screenshare: "overlap",
-      start_recording_on: "bot_join_or_participant_join",
       include_bot_in_recording: { audio: false },
       transcript: { provider: { meeting_captions: {} } },
     },
