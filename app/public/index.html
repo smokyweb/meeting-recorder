@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meeting Recorder</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #181b22;
+    --border: #262a33;
+    --text: #e6e8ec;
+    --muted: #8b93a5;
+    --accent: #4c8bf5;
+    --ok: #3ecf8e;
+    --warn: #f5a524;
+    --err: #f26969;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { margin: 0 0 4px; font-weight: 600; font-size: 24px; }
+  .sub { color: var(--muted); margin-bottom: 28px; font-size: 14px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 22px 26px;
+    margin-bottom: 22px;
+  }
+  h2 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
+  form { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+  .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+  input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 9px 12px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  button {
+    background: var(--accent);
+    color: white;
+    border: 0;
+    border-radius: 6px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.danger { background: transparent; color: var(--err); border: 1px solid var(--border); padding: 6px 12px; font-size: 12px; }
+  button.link { background: transparent; color: var(--accent); padding: 6px 12px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; }
+  .msg { padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 13px; }
+  .msg.err { background: rgba(242,105,105,0.1); color: var(--err); border: 1px solid rgba(242,105,105,0.3); }
+  .msg.ok { background: rgba(62,207,142,0.1); color: var(--ok); border: 1px solid rgba(62,207,142,0.3); }
+  .row { border-top: 1px solid var(--border); padding: 14px 0; display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .row:first-of-type { border-top: 0; }
+  .row-main { flex: 1; min-width: 260px; }
+  .row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .label { font-weight: 600; margin-bottom: 2px; }
+  .meta { color: var(--muted); font-size: 12px; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--border);
+    color: var(--muted);
+    margin-right: 6px;
+  }
+  .pill.recording { background: rgba(242,105,105,0.2); color: var(--err); }
+  .pill.scheduled, .pill.ready { background: rgba(76,139,245,0.2); color: var(--accent); }
+  .pill.done, .pill.completed, .pill.call_ended { background: rgba(62,207,142,0.2); color: var(--ok); }
+  .pill.failed, .pill.fatal, .pill.lookup_failed { background: rgba(245,165,36,0.2); color: var(--warn); }
+  .empty { color: var(--muted); padding: 20px 0; text-align: center; font-size: 14px; }
+  a { color: var(--accent); }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Meeting Recorder</h1>
+  <div class="sub">Schedule an unattended Recall.ai bot to record a Zoom, Meet, or Teams meeting. Minimum 10 minutes in the future.</div>
+
+  <div class="card">
+    <h2>Schedule a recording</h2>
+    <div id="form-msg"></div>
+    <form id="form">
+      <div class="full">
+        <label for="url">Meeting URL</label>
+        <input id="url" type="url" placeholder="https://zoom.us/j/..." required />
+      </div>
+      <div class="full">
+        <label for="label">Label (optional)</label>
+        <input id="label" type="text" placeholder="e.g. Sunday service" />
+      </div>
+      <div>
+        <label for="start">Start</label>
+        <input id="start" type="datetime-local" required />
+      </div>
+      <div>
+        <label for="stop">Stop</label>
+        <input id="stop" type="datetime-local" required />
+      </div>
+      <div class="full">
+        <button type="submit" id="submit">Schedule recording</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin: 0;">Recordings</h2>
+      <button class="link" onclick="refresh()">Refresh</button>
+    </div>
+    <div id="list"></div>
+  </div>
+
+</div>
+
+<script>
+const form = document.getElementById("form");
+const msg = document.getElementById("form-msg");
+const submit = document.getElementById("submit");
+
+function showMsg(type, text) {
+  msg.innerHTML = `<div class="msg ${type}">${text}</div>`;
+  if (type === "ok") setTimeout(() => (msg.innerHTML = ""), 6000);
+}
+
+// Pre-fill start/stop to something sensible: tomorrow 9am → 5pm local.
+(function prefill() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+  const stop = new Date(tomorrow);
+  stop.setHours(17, 0, 0, 0);
+  const fmt = (d) => {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  document.getElementById("start").value = fmt(tomorrow);
+  document.getElementById("stop").value = fmt(stop);
+})();
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  msg.innerHTML = "";
+  submit.disabled = true;
+  submit.textContent = "Scheduling...";
+
+  // datetime-local gives "YYYY-MM-DDTHH:MM" in the browser's local TZ.
+  // new Date(v).toISOString() converts correctly to UTC.
+  const start_at = new Date(document.getElementById("start").value).toISOString();
+  const stop_at = new Date(document.getElementById("stop").value).toISOString();
+  const meeting_url = document.getElementById("url").value.trim();
+  const label = document.getElementById("label").value.trim();
+
+  try {
+    const res = await fetch("/api/recordings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ meeting_url, start_at, stop_at, label }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showMsg("err", data.error || "Failed to schedule");
+    } else {
+      showMsg("ok", `✓ Scheduled. Bot ID: ${data.bot_id}`);
+      form.reset();
+      refresh();
+    }
+  } catch (err) {
+    showMsg("err", err.message);
+  } finally {
+    submit.disabled = false;
+    submit.textContent = "Schedule recording";
+  }
+});
+
+function fmtLocal(iso) {
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      weekday: "short", month: "short", day: "numeric",
+      hour: "numeric", minute: "2-digit",
+    });
+  } catch { return iso; }
+}
+
+async function refresh() {
+  const list = document.getElementById("list");
+  list.innerHTML = `<div class="empty">Loading…</div>`;
+  try {
+    const res = await fetch("/api/recordings");
+    const items = await res.json();
+    if (items.length === 0) {
+      list.innerHTML = `<div class="empty">No recordings scheduled yet.</div>`;
+      return;
+    }
+    list.innerHTML = items.map(renderRow).join("");
+  } catch (err) {
+    list.innerHTML = `<div class="msg err">${err.message}</div>`;
+  }
+}
+
+function renderRow(r) {
+  const status = r.status || "unknown";
+  const cls = status.toLowerCase().replace(/\./g, "_");
+  const actions = [];
+  if (r.video_url) actions.push(`<a class="link" href="${r.video_url}" target="_blank" rel="noopener">Download video</a>`);
+  if (r.transcript_url) actions.push(`<a class="link" href="${r.transcript_url}" target="_blank" rel="noopener">Transcript</a>`);
+  if (!["done", "completed", "call_ended", "fatal"].includes(status)) {
+    actions.push(`<button class="danger" onclick="stopBot('${r.bot_id}')">Cancel</button>`);
+  }
+  return `
+    <div class="row">
+      <div class="row-main">
+        <div class="label">${escapeHtml(r.label)}</div>
+        <div class="meta">${fmtLocal(r.start_at)} → ${fmtLocal(r.stop_at)}</div>
+        <div class="meta" style="word-break: break-all;">${escapeHtml(r.meeting_url)}</div>
+        <div style="margin-top: 6px;"><span class="pill ${cls}">${status}</span></div>
+      </div>
+      <div class="row-actions">${actions.join("")}</div>
+    </div>
+  `;
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+async function stopBot(botId) {
+  if (!confirm("Cancel this recording? If the bot is already in the call it will leave.")) return;
+  try {
+    const res = await fetch(`/api/recordings/${botId}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Stop failed");
+    refresh();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// Auto-refresh every 30s so status updates naturally.
+refresh();
+setInterval(refresh, 30_000);
+</script>
+</body>
+</html>
